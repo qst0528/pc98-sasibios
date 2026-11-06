@@ -11,8 +11,9 @@ PC-9801 のノーマルモード用の SASI 固定ディスク BIOS を、機能
 
 ビルド: `python3 sasibios/mkrom.py`（nasm が要る。4 KB の全バイトの和を 00h に合わせた `sasibios/sasi.rom` を書く）。
 
-ビルド済みの ROM: `dist/sasi.rom`（このコミットの `sasibios/sasi.asm` を、上の手順でビルドしたもの。4 KB。SHA-256 は `dist/SHA256SUMS`）。
-自分でビルドした `sasibios/sasi.rom` と同じバイト列になるはず（nasm の版が違うと変わることがある。使った版は下の「ビルドの記録」）。
+ビルド済みの ROM: `sasibios/sasi.rom`（実装側が `sasi.asm` と一緒にコミットしたもの。4 KB）。
+調査側も同じソースを別にビルドし、SHA-256 が合うことを確かめて、いちばん上の `SHA256SUMS` に書いた。
+自分でビルドしても同じバイト列になるはず（nasm の版が違うと変わることがある。使った版は下の「ビルドの記録」）。
 
 - `bios/test/`: 調査側が用意した試験と模型（本体の BIOS、SASI のターゲット、8237、8259 の模型）。仕様書の 4〜6 節の約束を真似たもので、NEC のコードは含まない。
   `python3 bios/test/sasi/test_sasi.py`、`python3 bios/test/sasi/test_detail.py` で、`sasibios/sasi.asm` が仕様書に合っているかを確かめる（nasm と unicorn が要る）。
@@ -42,4 +43,4 @@ NEC の版どうしの行は、同じ系統のコード（前の版を引き継�
 | INT 1Bh の出口の処理 | 16 バイト | 仕様書の 6.1 の出口の決まり（結果の AH を [BP+1] に、AH ≥ 20h なら [BP+16h] の CF を立てる）をそのまま命令にしたもの |
 | 合わせて | 223 バイト | 使っている 3,769 バイトの約 6 % |
 
-**ビルドの記録**: `dist/sasi.rom` は NASM version 2.16.01 でビルドした（4096 バイト、SHA-256 608b96d5b3c57d749f2cf872de5b7c3661dfeb48241d1a9086b377891cff1f71）。
+**ビルドの記録**: 調査側は NASM version 2.16.01 でビルドし直し、`sasibios/sasi.rom` と同じバイト列であることを確かめた（4096 バイト、SHA-256 608b96d5b3c57d749f2cf872de5b7c3661dfeb48241d1a9086b377891cff1f71）。
