@@ -1,10 +1,13 @@
 # PC-98 SASI 固定ディスク BIOS 仕様書（案）
 
-版: 0.19.3（2026-11-06、案）。状態: 実装に渡せる段階。実機での確かめで直す。
+版: 0.19.4（2026-11-06、案）。状態: 実装に渡せる段階。実機での確かめで直す。
 版の付け方: 中身の変更は 0.x、小さな直し（例の追加、誤りの訂正など）は 0.x.y で上げる（2026-11-01、ユーザーの決定）。
 
 <details>
-<summary>更新履歴（0.19.3 版から 0.2 版まで、49 版分）</summary>
+<summary>更新履歴（0.19.4 版から 0.2 版まで、50 版分）</summary>
+
+**0.19.4 版での変更**
+- 付録 E: PC-9801ES-35 が 40 MB であることの根拠に、NEC の商品情報（4,920 トラック、33 セクタ / トラック、256 バイト / セクタ）を足した（2026-11-06、ユーザー）。振る舞いは変えない。
 
 **0.19.3 版での変更**
 - 公開先のリポジトリ（pc98-sasibios）の main の枝には、これからは変更をコミットとして足していき、履歴を残す（作り直しや履歴の書き換えはしない。2026-11-06、ユーザー）。仕様書の中身と振る舞いは変えない。
@@ -1039,7 +1042,7 @@ SASIBIOS を実際に置けるか（拡張 ROM の焼き直しなど、1.2）は
 |---|---|---|
 | PC-9801UX21 | 80286（10 MHz）と V30[[162]](#ref-162) | PC-9801UX-31（20 MB） |
 | PC-98XL^2 | 80386（16 MHz）。V30 は未確認[[165]](#ref-165) | PC-98XL^2-31（40 MB） |
-| PC-9801EX2、ES2 | EX2 は 80286（12 MHz）、ES2 は 80386SX（16 MHz）。どちらも V30 も載せる[[165]](#ref-165)[[164]](#ref-164) | PC-9801ES-34（20 MB）、ES-35（40 MB。[3] の表の 20 MB は誤植とする。型番の末尾 -35 はほかはどれも 40 MB。ES-35 のスイッチの設定は RA-35 と同じという記述もある[[150]](#ref-150)） |
+| PC-9801EX2、ES2 | EX2 は 80286（12 MHz）、ES2 は 80386SX（16 MHz）。どちらも V30 も載せる[[165]](#ref-165)[[164]](#ref-164) | PC-9801ES-34（20 MB）、ES-35（40 MB。NEC の商品情報で 4,920 トラック、33 セクタ / トラック、256 バイト / セクタ[[183]](#ref-183)。[3] の表の 20 MB は誤植。ES-35 のスイッチの設定は RA-35 と同じという記述もある[[150]](#ref-150)） |
 | PC-9801T model W2 | 80386SX（20 MHz）と V30[[165]](#ref-165) | PC-9801T-35（40 MB） |
 | PC-98DO+ | V33A（16 MHz）[[165]](#ref-165) | PC-98DO+-35（40 MB）。SASIHBA は要らず、SASI のターゲットは DO34（本体の 34 ピンを SASI の 50 ピンに変える基板）でつなぐ（下の注） |
 | PC-9801CS2 | 80386SX（16 MHz）。V30 は未確認[[165]](#ref-165) | PC-9801CS-35（40 MB） |
@@ -1104,3 +1107,4 @@ SASIBIOS を実際に置けるか（拡張 ROM の焼き直しなど、1.2）は
 - <a id="ref-165"></a>[165] NEC Retro の機種のページ（CPU とクロック、副の V30 の有無。2026-11-05 に、Anubis のため wikitext を `action=raw` で読んだ）: XL² https://necretro.org/PC-98XL² 、VM21（VM11 を含む）https://necretro.org/PC-9801_VM21 、RA https://necretro.org/PC-9801_RA 、RX https://necretro.org/PC-9801_RX 、RS https://necretro.org/PC-9801_RS 、RL https://necretro.org/PC-98RL 、EX https://necretro.org/PC-9801_EX 、DX https://necretro.org/PC-9801_DX 、DA https://necretro.org/PC-9801_DA 、DS https://necretro.org/PC-9801_DS 、T https://necretro.org/PC-9801_T 、DO+ https://necretro.org/PC-98_DO+ 、CS https://necretro.org/PC-9801_CS 。クロックは「10-12MHz」のように幅で書く所がある
 - <a id="ref-166"></a>[166] Wikipedia 日本語版「PC-9801シリーズ」（機種ごとの CPU。2026-11-05 に見た）: https://ja.wikipedia.org/wiki/PC-9801シリーズ
 - <a id="ref-167"></a>[167] 第三研究所 第一電算機研究室「PC-9801FA ネタ」（F シリーズの機種と CPU、専用 SCSI スロット、PC-9801FA-03 と DIP SW 5。2023-07-01 更新。2026-11-05 に見た）: http://www.amy.hi-ho.ne.jp/nakajima-jr/com/pc-9801/fa.htm
+- <a id="ref-183"></a>[183] NEC LAVIE 公式サイト「商品情報 PC-9801ES-35」（増設用 3.5 インチ固定ディスクドライブ。4,920 トラック、33 セクタ / トラック、256 バイト / セクタ。拡張用固定ディスクユニット接続用インタフェース内蔵。実装本体は PC-9801EX2、ES2。1989 年 4 月出荷。2026-11-06 に見た）: https://support.nec-lavie.jp/support/product/data/spec/out/o067-1.html

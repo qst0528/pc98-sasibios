@@ -5,7 +5,8 @@
 ; 注の「Qn」は QUESTIONS.md の項目番号で、答えの出た項目は仕様書の付録 D にその節がある。
 ;
 ; 作り方: python3 sasibios/mkrom.py（nasm で組み立て、4 KB の和を 00h に合わせて sasibios/sasi.rom を書く）。
-;         sasi.rom もコミットする。このファイルを直したら、そのたびに作り直して一緒にコミットする
+;         sasi.rom もコミットする。このファイルを直したら、そのたびに作り直して一緒にコミットし、
+;         コミットメッセージに組み立てに使った nasm のバージョン（nasm -v）を書く
 ; 試験:   python3 bios/test/sasi/test_sasi.py、python3 bios/test/sasi/test_detail.py（調査側が用意したもの）
 ;
 ; スタック（仕様書 2.6）: INT 1Bh は本体の 9 語の下で割り込みハンドラを含めて 28 バイト、初期化 1〜3 は 34 バイト、
