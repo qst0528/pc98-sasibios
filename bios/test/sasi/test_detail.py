@@ -677,6 +677,19 @@ def test_recal_retract():
     assert r["ah"] == 0 and m.t.log[-1][4] == 0xC0
 
 
+
+def test_recal_retract_thick():
+    """仕様書 3.3 のシリンダだけのシーク（Q50。0.20 版）: 厚型の 100b は、組 B のヘッド数（4）で計算する（+18h の 8 ではない）。"""
+    m = Machine({0: Drive(4)})                                   # 初期化のあとは厚型
+    n = len(m.t.log)
+    r = m.int1b(ax=0x0700)
+    assert r["ah"] == 0 and r["cf"] == 0
+    assert [(op, lba) for op, _, lba, *_ in m.t.log[n:]] == [(0xC2, 0), (0x0B, 5 * 4 * 33), (0x01, 0), (0xC2, 0)]
+    n = len(m.t.log)
+    r = m.int1b(ax=0x0F00)
+    assert [(op, lba) for op, _, lba, *_ in m.t.log[n:]] == [(0xC2, 0), (0x0B, 0x2A0 * 4 * 33), (0xC2, 0)]
+
+
 def test_format():
     """仕様書 6.3 の Dh（Q18）。"""
     d = Drive(3)

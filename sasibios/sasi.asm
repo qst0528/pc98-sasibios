@@ -1,7 +1,7 @@
 ; SPDX-License-Identifier: MIT
 ; PC-9801 ノーマルモード用の SASI 固定ディスク BIOS（クリーンルームの実装）
 ;
-; 根拠は docs/sasibios_spec.md（仕様書 0.14 版）の 0〜9 節と付録 C だけ。付録 A は不採用、付録 B は入れていない。
+; 根拠は docs/sasibios_spec.md（仕様書 0.20 版）の 0〜9 節と付録 C、付録 B（DMA のチャネルの選び方。0.14 版で採用）だけ。付録 A は不採用。
 ; 注の「Qn」は QUESTIONS.md の項目番号で、答えの出た項目は仕様書の付録 D にその節がある。
 ;
 ; 作り方: python3 sasibios/mkrom.py（nasm で組み立て、4 KB の和を 00h に合わせて sasibios/sasi.rom を書く）。
@@ -1254,10 +1254,12 @@ params:                                 ; ES:DI = 組の 8 バイト
         jmp     sasi_exec
 
 ; 組 B を設定したあと、シリンダ AX へシークする（リキャリブレート、リトラクト）。
-; LBA = シリンダ × H（表の +18h）× S（仕様書 3.3 の「シリンダだけのシーク」。Q9）。ES:DI = 表
+; LBA = シリンダ × H_B × S。H_B は組 B のヘッド数（表の +0Ch〜+0Dh のビッグエンディアンの 1 語 + 1）
+; （仕様書 3.3 の「シリンダだけのシーク」。Q9、Q50）。ES:DI = 表
 seek_cyl:
-        xor     bh, bh
-        mov     bl, [es:di + 18h]
+        mov     bx, [es:di + 0Ch]
+        xchg    bl, bh
+        inc     bx
         mul     bx
         push    ax
         call    is512
