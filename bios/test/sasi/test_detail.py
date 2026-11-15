@@ -10,6 +10,7 @@
   試験を直さずに QUESTIONS.md に書く。
 - 使い方: `python3 bios/test/sasi/test_detail.py [試験の名前の一部 ...]`（nasm と Python の unicorn が要る）。
   ROM は `sasibios/mkrom.py` の build() で作る（sasi.asm を組み立て、0FFFh で和を合わせる）。
+  ROM を置く番地は環境変数 SASI_SEG で替えられる（既定は D700。例: `SASI_SEG=D000 python3 bios/test/sasi/test_detail.py`。仕様書 1.2 の D0000h〜DFFFFh の 4 KB 境界）。
 """
 
 import os
@@ -35,7 +36,12 @@ import mkrom                                     # noqa: E402
 from models_detail import PIC, DMA, Drive, Target       # noqa: E402
 
 HOST_SEG = 0x1000
-SASI_SEG = 0xD700
+SASI_SEG = int(os.environ.get("SASI_SEG", "D700"), 16)   # ROM を置くセグメント（D000h〜DF00h の 4 KB 境界。仕様書 1.2）。環境変数で替えて試せる
+
+
+def xrom_id(seg):
+    """拡張 ROM の ID の表（0000:04D0h〜04DFh）の、seg の 4 KB に当たる番地。"""
+    return 0x4D0 + ((seg >> 8) - 0xD0)
 STACK = 0x7C00
 
 
@@ -279,8 +285,8 @@ def test_init_register():
     """仕様書 4.2、4.3、2.6（05E8h / 05ECh）。"""
     d0, d1 = Drive(1), Drive(3, sec512=True)
     m = Machine({0: d0, 1: d1})
-    assert m.byte(0x4D7) == 0xE9
-    assert m.byte(0x4B0) == 0xD7 and m.byte(0x4B8) == 0xD7
+    assert m.byte(xrom_id(SASI_SEG)) == 0xE9
+    assert m.byte(0x4B0) == SASI_SEG >> 8 and m.byte(0x4B8) == SASI_SEG >> 8
     assert m.byte(0x480) & 0x80
     assert m.word(0x44) != 0 and m.word(0x46) == SASI_SEG       # INT 11h
     assert not m.pic.imr[0x0A] & 0x02                            # IR9 のマスクを外した
@@ -362,17 +368,19 @@ def test_init_dipsw():
 def test_no_controller():
     """仕様書 4.3 の 1（登録は取り消さない。Q32）。"""
     m = Machine(target=Target({0: Drive(1)}, present=False))
-    assert m.byte(0x4B0) == 0xD7                                 # 登録は初期化 1 で済んでいる
+    assert m.byte(0x4B0) == SASI_SEG >> 8                        # 登録は初期化 1 で済んでいる
     assert m.word(0x46) == 0                                     # 割り込みベクタは置かない
     assert m.byte(0x55D) == 0
 
 
 def test_two_copies():
     """仕様書 1.2、4.2、4.3。"""
-    m = Machine({0: Drive(1)}, segs=(0xD500, SASI_SEG))
-    assert m.byte(0x4D5) == 0xE9 and m.byte(0x4D7) == 0xE9
-    assert m.byte(0x4B0) == 0xD5
-    assert m.word(0x46) == 0xD500
+    other = 0xD500 if SASI_SEG != 0xD500 else 0xD600              # もう 1 つの写しの番地
+    owner = min(other, SASI_SEG)                                 # 本体は低い番地から呼ぶので、低いほうが持ち主
+    m = Machine({0: Drive(1)}, segs=(other, SASI_SEG))
+    assert m.byte(xrom_id(other)) == 0xE9 and m.byte(xrom_id(SASI_SEG)) == 0xE9
+    assert m.byte(0x4B0) == owner >> 8
+    assert m.word(0x46) == owner
     assert m.t.resets == 2                                       # 初期化 2 は持ち主だけ
     n = len(m.t.log)
     m.run(0x0006, ax=0x0C)                                       # ブートの AL が対象外: 何もせず戻る
