@@ -1,7 +1,7 @@
 ; SPDX-License-Identifier: MIT
 ; PC-9801 ノーマルモード用の SASI 固定ディスク BIOS（クリーンルームの実装）
 ;
-; 根拠は docs/sasibios_spec.md（仕様書 0.20 版）の 0〜9 節と付録 C、付録 B（DMA のチャネルの選び方。0.14 版で採用）だけ。付録 A は不採用。
+; 根拠は docs/sasibios_spec.md（仕様書 0.21 版）の 0〜9 節と付録 C、付録 B（DMA のチャネルの選び方。0.14 版で採用）だけ。付録 A は不採用。
 ; 注の「Qn」は QUESTIONS.md の項目番号で、答えの出た項目は仕様書の付録 D にその節がある。
 ;
 ; 作り方: python3 sasibios/mkrom.py（nasm で組み立て、4 KB の和を 00h に合わせて sasibios/sasi.rom を書く）。
@@ -642,6 +642,7 @@ probe_unit:
 .notua:
         cmp     ch, 20h                 ; SASI のセンス 20h: 6 バイト型
         jne     .none
+.six:
         test    byte [bp + F_AH], W_ID1 ; ID 1 の 6 バイト型は扱わない（Q49）
         jnz     .none
         and     byte [bp + F_AH], ~(W_PROBE | W_COUNT) & 0FFh
@@ -692,7 +693,7 @@ probe_unit:
         cmp     cx, 256
         jne     .none
         jbe32   615 * 8 * 33, .x256t
-        jmp     .none                   ; ブロック長 256 は 40 MB まで（付録 C、0.13 版）
+        jmp     .six                    ; ブロック長 256 で 40 MB を超えるものは 6 バイト型（付録 C、0.21 版）
 .x256t:
         mov     bl, 2
         jae32   614 * 8 * 33, .xset
