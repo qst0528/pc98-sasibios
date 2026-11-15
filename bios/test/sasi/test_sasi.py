@@ -5,7 +5,8 @@ SASI / SCSI のターゲットの模型の上で動かす。バス（I/O 80h、8
 - 各試験は、仕様書（docs/sasibios_spec.md）に書いてある振る舞いだけを確かめる。docstring に節を書いてある。
 - 試験が仕様書と合わない、または仕様書にない振る舞いを求めていると思ったら、試験を直さずに QUESTIONS.md に書く。
 - 使い方: `python3 bios/test/sasi/test_sasi.py [試験の名前 ...]`（nasm と Python の unicorn が要る）。
-  BIOS のソースは sasibios/sasi.asm。別の場所なら環境変数 SASI_ASM で指す。ROM は D7000h（ROM_SEG）に置く。
+  BIOS のソースは sasibios/sasi.asm。別の場所なら環境変数 SASI_ASM で指す。ROM は ROM_SEG（既定は D7000h）に置く。
+  ROM を置く番地は環境変数 SASI_SEG で替えられる（既定は D700。例: `SASI_SEG=D000 python3 bios/test/sasi/test_sasi.py`。仕様書 1.2 の D0000h〜DFFFFh の 4 KB 境界）。
 """
 
 import os
@@ -28,7 +29,12 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 HOST_ASM = os.path.join(ROOT, "bios", "test", "host.asm")
 SASI_ASM = os.environ.get("SASI_ASM", os.path.join(ROOT, "sasibios", "sasi.asm"))
 HOST_SEG = 0x1000
-ROM_SEG = 0xD700
+ROM_SEG = int(os.environ.get("SASI_SEG", "D700"), 16)    # ROM を置くセグメント（仕様書 1.2）。test_detail.py と同じ環境変数
+
+
+def xrom_id(seg):
+    """拡張 ROM の ID の表（0000:04D0h〜04DFh）の、seg の 4 KB に当たる番地。"""
+    return 0x4D0 + ((seg >> 8) - 0xD0)
 
 S_REQ, S_ACK, S_BSY, S_MSG, S_CXD, S_IXO, S_INT = 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x01
 
@@ -512,8 +518,8 @@ def test_ux31_one_drive(rom, host):
     """UX-31 型のコントローラ（6 バイト型）1 台。仕様書 4.1、4.2、4.3、2.4、2.5、6.3（センス、新センス）、付録 C（調べ方、ユニットの宛先）。"""
     ctl = SasiController({0: Disk(615 * 8 * 33, 256)})
     m = Machine(rom, host, {0: ctl}, dip=dip(6, 7))
-    assert m.byte(0x4D7) == 0xE9
-    assert m.byte(0x4B0) == 0xD7 and m.byte(0x4B8) == 0xD7
+    assert m.byte(xrom_id(ROM_SEG)) == 0xE9
+    assert m.byte(0x4B0) == ROM_SEG >> 8 and m.byte(0x4B8) == ROM_SEG >> 8
     assert m.byte(0x55D) & 3 == 1, hex(m.byte(0x55D))
     assert m.byte(0x480) & 0x80
     # READ CAPACITY は 6 バイトで断られ、7 バイト目以降は送られていない
@@ -620,19 +626,21 @@ def test_no_target(rom, host):
     """ターゲットがいなくても、初期化 1 で登録はする。仕様書 4.2、付録 C。"""
     m = Machine(rom, host, {})
     assert m.byte(0x55D) & 3 == 0
-    assert m.byte(0x4B0) == 0xD7
+    assert m.byte(0x4B0) == ROM_SEG >> 8
 
 
 def test_mirror_d5_d7(rom, host):
     """同じ ROM が 2 か所に見えるとき。仕様書 1.2、4.2、4.3。"""
     ctl = SasiController({0: Disk(615 * 8 * 33, 256)})
-    m = Machine(rom, host, {0: ctl}, dip=dip(6, 7), segs=(0xD500, 0xD700))
-    assert m.byte(0x4D5) == 0xE9 and m.byte(0x4D7) == 0xE9
-    assert m.byte(0x4B0) == 0xD5 and m.byte(0x4B8) == 0xD5
-    assert m.mem(0x11 * 4 + 2, 2) == bytes((0x00, 0xD5))
+    other = 0xD500 if ROM_SEG != 0xD500 else 0xD600               # もう 1 つの写しの番地
+    owner = min(other, ROM_SEG)                                  # 本体は低い番地から呼ぶので、低いほうが持ち主
+    m = Machine(rom, host, {0: ctl}, dip=dip(6, 7), segs=(other, ROM_SEG))
+    assert m.byte(xrom_id(other)) == 0xE9 and m.byte(xrom_id(ROM_SEG)) == 0xE9
+    assert m.byte(0x4B0) == owner >> 8 and m.byte(0x4B8) == owner >> 8
+    assert m.mem(0x11 * 4 + 2, 2) == owner.to_bytes(2, "little")
     assert m.byte(0x55D) & 3 == 1, hex(m.byte(0x55D))
     probes = sum(1 for c in ctl.log if c[0] == 0x25 and c[1] == 0x00)
-    assert probes == 1, ctl.log                 # LUN 0 の確かめは D5000h の 1 回だけ
+    assert probes == 1, ctl.log                 # LUN 0 の確かめは持ち主の 1 回だけ
     r = m.int1b(ax=0x8480)
     assert r["cf"] == 0 and r["cx"] == 614, r
 
