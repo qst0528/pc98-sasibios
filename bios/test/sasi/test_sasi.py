@@ -138,6 +138,24 @@ class SasiController:
             disk.write(lba * k + i, b[i * 256:(i + 1) * 256])
 
 
+class HenkanController(SasiController):
+    """SASI のコントローラで、READ CAPACITY（10 バイト）にも答えるもの（仕様書 0.21 版、付録 C の見分け方の 2）。
+    LUN 0 だけ。READ CAPACITY は 10 バイトを受け取り、ブロック長 256 と容量を返し、ステータスは 0Ch（2026-11-15 の実機の答え）"""
+
+    def cmd_len(self, cdb):
+        if len(cdb) >= 1 and cdb[0] >> 5 == 1:
+            return 10
+        return super().cmd_len(cdb)
+
+    def execute(self, cdb, bus):
+        if cdb[0] == 0x25 and cdb[1] >> 5 == 0:
+            self.log.append(bytes(cdb))
+            d = self.luns[0]
+            bus.data_in(struct.pack(">II", d.blocks - 1, 256), lambda: bus.to_status(0x0C))
+            return
+        super().execute(cdb, bus)
+
+
 class ScsiTarget:
     """SCSI のターゲットの模型（LUN 0 だけ。仕様書 付録 C）。電源投入とリセットのあと 1 回 UNIT ATTENTION"""
 
@@ -717,13 +735,43 @@ def test_scsi_256_small(rom, host):
         m = Machine(rom, host, {0: ScsiTarget(Disk(blocks, 256))})
         r = m.int1b(ax=0x8480)
         assert r["ah"] == nsense and r["cx"] == cyls - 1 and r["dx"] >> 8 == heads and r["bx"] == 256, (blocks, r)
-    # ブロック長 256 は 615 × 8 × 33 まで。超えるユニットは使わない（仕様書 0.13 版）
+    # ブロック長 256 の 10 バイト型は 615 × 8 × 33 まで。超えるユニットは 6 バイト型として扱い、容量コードが 111b なので「なし」（仕様書 0.13 版、0.21 版）
     m = Machine(rom, host, {0: ScsiTarget(Disk(615 * 8 * 33 + 1, 256))})
     assert m.byte(0x55D) & 1 == 0, hex(m.byte(0x55D))
     m = Machine(rom, host, {0: ScsiTarget(Disk(65535 * 8 * 33, 256))})
     assert m.byte(0x55D) & 1 == 0, hex(m.byte(0x55D))
     m = Machine(rom, host, {0: ScsiTarget(Disk(1000, 256))})
     assert m.byte(0x55D) & 1 == 0
+
+
+def test_sasi_256_over_40mb(rom, host):
+    """READ CAPACITY に 40 MB を超える容量（ブロック長 256）を返す SASI のターゲット。6 バイト型として扱う。仕様書 0.21 版、付録 C の見分け方の 2、6。"""
+    disk = Disk(640 * 8 * 33, 256)
+    ctl = HenkanController({0: disk})
+    m = Machine(rom, host, {0: ctl}, dip=dip(6, 7))
+    assert m.byte(0x55D) & 3 == 1, hex(m.byte(0x55D))
+    assert any(c[0] == 0x25 and len(c) == 10 for c in ctl.log), ctl.log[:3]
+    assert any(c[0] == 0xC2 and len(c) == 16 for c in ctl.log), ctl.log
+    r = m.int1b(ax=0x8480)
+    assert r["cf"] == 0 and r["ah"] == 0x07, r
+    assert r["bx"] == 256 and r["cx"] == 614 and r["dx"] == 0x0821, r
+    n = len(ctl.log)
+    r = m.int1b(ax=0x0680, bx=512, cx=0, dx=0, es=0x2000, bp=0)
+    assert r["cf"] == 0 and m.mem(0x20000, 512) == disk.read(0) + disk.read(1), r
+    assert [c[0] for c in ctl.log[n:]] == [0x08], ctl.log[n:]
+    # 容量コードが 111b なら「なし」
+    m = Machine(rom, host, {0: HenkanController({0: Disk(640 * 8 * 33, 256)})}, dip=dip(7, 7))
+    assert m.byte(0x55D) & 3 == 0, hex(m.byte(0x55D))
+    # 81h の次の候補（ID 1 の LUN 0）がこれに当たるときは「なし」
+    m = Machine(rom, host, {0: HenkanController({0: Disk(640 * 8 * 33, 256)}),
+                            1: ScsiTarget(Disk(640 * 8 * 33, 256))}, dip=dip(6, 6))
+    assert m.byte(0x55D) & 3 == 1, hex(m.byte(0x55D))
+    # ブート
+    disk = Disk(640 * 8 * 33, 256)
+    disk.write(0, b"\xEB\x0A\x90\x90IPL1" + bytes(248))
+    m = Machine(rom, host, {0: HenkanController({0: disk})}, dip=dip(6, 7))
+    end = m.run(0x0006, until=0x1FE00, ax=0x0A)
+    assert end == 0x1FE00, hex(end)
 
 
 class StuckTarget(ScsiTarget):
